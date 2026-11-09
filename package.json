@@ -1,0 +1,71 @@
+{
+  "name": "jlcfconv",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "嘉立创文件转换，PCB 3D HTML 静态展示与触控适配工具",
+  "author": "NianBroken",
+  "repository": "https://github.com/NianBroken/JLCFConv",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "tsx scripts/dev.ts",
+    "build": "tsc --noEmit && vite build && tsx scripts/build-server.ts",
+    "start": "node dist-server/main.js",
+    "test": "vitest run",
+    "test:e2e": "tsx tests/e2e.ts",
+    "resources": "tsx scripts/prepare-resources.ts",
+    "setup:https": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/setup-https.ps1",
+    "service:install": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/service.ps1 -Action Install",
+    "service:stop": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/service.ps1 -Action Stop",
+    "service:status": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/service.ps1 -Action Status",
+    "format": "prettier --write src scripts tests *.ts *.json index.html",
+    "format:check": "prettier --check src scripts tests *.ts *.json index.html"
+  },
+  "dependencies": {
+    "@babel/parser": "^8.1.0",
+    "@babel/traverse": "^8.1.0",
+    "@babel/types": "^8.1.0",
+    "archiver": "^8.0.0",
+    "express": "^5.3.0",
+    "icojs": "^1.0.1",
+    "lucide-react": "^1.70.0",
+    "magic-string": "^1.4.5",
+    "multer": "^2.5.0",
+    "parse5": "^8.1.1",
+    "postcss": "^8.5.32",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "sharp": "^0.35.5",
+    "terser": "^5.51.2",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.5",
+    "@types/archiver": "^8.0.0",
+    "@types/babel__traverse": "^7.28.0",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.3.0",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/supertest": "^7.2.1",
+    "@vitejs/plugin-react": "^6.2.1",
+    "esbuild": "^0.28.2",
+    "playwright": "^1.65.0",
+    "prettier": "^3.9.10",
+    "supertest": "^7.3.2",
+    "tailwindcss": "^4.3.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.6",
+    "vitest": "^5.1.0"
+  },
+  "overrides": {
+    "minimatch": "^11.0.1"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}

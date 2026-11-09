@@ -1,0 +1,79 @@
+[
+  {
+    "url": "https://modules.lceda.cn/smt-gl-engine/4.1.33.9acde59c/rust_core_bg.wasm",
+    "file": "9f094a25dff15429-rust_core_bg.wasm",
+    "bytes": 591390,
+    "hash": "c128535d2f444e03ec4153fee57abe4e294584b0a79d9f039414e6237f2b126f",
+    "mime": "application/wasm"
+  },
+  {
+    "url": "https://modules.lceda.cn/smt-gl-engine/4.1.33.9acde59c/rust_core_single_bg.wasm",
+    "file": "5463786c475ea663-rust_core_single_bg.wasm",
+    "bytes": 589419,
+    "hash": "614b90c75abb75e01fc80d8a20afdd43647089976654c3b546d75a533e0c2bcf",
+    "mime": "application/wasm"
+  },
+  {
+    "url": "https://modules.lceda.cn/smt-gl-engine/4.1.33.9acde59c/occapi-5RGN6PI2.wasm",
+    "file": "ca441a2dcbdcacaf-occapi-5RGN6PI2.wasm",
+    "bytes": 24905347,
+    "hash": "2054c278876db35418b16e2faf354dbe9d07c4cc5e1facc6cb0508110791775f",
+    "mime": "application/wasm"
+  },
+  {
+    "url": "https://modules.lceda.cn/smt-ui/1.0.353.4cd90317/assets/KFOmCnqEu92Fr1Mu72xKKTU1Kvnz-C4BNUZX7.woff2",
+    "file": "b22d4ffe68ce0219-KFOmCnqEu92Fr1Mu72xKKTU1Kvnz-C4BNUZX7.woff2",
+    "bytes": 10576,
+    "hash": "100e88005a63f58b24c8b98a90fcd1a9c230bf853befa6e61c53661beaf84808",
+    "mime": "font/woff2"
+  },
+  {
+    "url": "https://modules.lceda.cn/smt-ui/1.0.353.4cd90317/assets/KFOmCnqEu92Fr1Mu5mxKKTU1Kvnz-BSQYLU6H.woff2",
+    "file": "b5083659566dd846-KFOmCnqEu92Fr1Mu5mxKKTU1Kvnz-BSQYLU6H.woff2",
+    "bytes": 6720,
+    "hash": "daf6c28c5a080458eba26ba64a95b1fcff823944d429ccb84e8a4f3a0baf05ca",
+    "mime": "font/woff2"
+  },
+  {
+    "url": "https://modules.lceda.cn/smt-ui/1.0.353.4cd90317/assets/KFOmCnqEu92Fr1Mu7mxKKTU1Kvnz-F5WD5FJO.woff2",
+    "file": "ee26ce2c16fa6d39-KFOmCnqEu92Fr1Mu7mxKKTU1Kvnz-F5WD5FJO.woff2",
+    "bytes": 796,
+    "hash": "89b90f0dec4d4b3675eca0b470ff8db5f9c72b275956928f4481c858e84068df",
+    "mime": "font/woff2"
+  },
+  {
+    "url": "https://modules.lceda.cn/smt-ui/1.0.353.4cd90317/assets/KFOmCnqEu92Fr1Mu4WxKKTU1Kvnz-LMHUXONC.woff2",
+    "file": "a31af30f85b74bef-KFOmCnqEu92Fr1Mu4WxKKTU1Kvnz-LMHUXONC.woff2",
+    "bytes": 5004,
+    "hash": "0b19fc45724144b55385e002576d8f81df740d2ad3de39861528a89ce143bd00",
+    "mime": "font/woff2"
+  },
+  {
+    "url": "https://modules.lceda.cn/smt-ui/1.0.353.4cd90317/assets/KFOmCnqEu92Fr1Mu7WxKKTU1Kvnz-ZGCKNGVK.woff2",
+    "file": "794fbfcf10f5cf9b-KFOmCnqEu92Fr1Mu7WxKKTU1Kvnz-ZGCKNGVK.woff2",
+    "bytes": 3384,
+    "hash": "6742ec1271dff587e859a90ce7e4bee26cfd60625f5bb95325650c6b04afda8d",
+    "mime": "font/woff2"
+  },
+  {
+    "url": "https://modules.lceda.cn/smt-ui/1.0.353.4cd90317/assets/KFOmCnqEu92Fr1Mu7GxKKTU1Kvnz-MOAIZRHF.woff2",
+    "file": "430149e2053def79-KFOmCnqEu92Fr1Mu7GxKKTU1Kvnz-MOAIZRHF.woff2",
+    "bytes": 8024,
+    "hash": "f36d71c69bcec4ce625d2923d36a4b1f64bbc2e5691c99cf8a4f3b0f79d1edb4",
+    "mime": "font/woff2"
+  },
+  {
+    "url": "https://modules.lceda.cn/smt-ui/1.0.353.4cd90317/assets/KFOmCnqEu92Fr1Mu4mxKKTU1Kg-RUTEC6WL.woff2",
+    "file": "b48f27956f6b8cee-KFOmCnqEu92Fr1Mu4mxKKTU1Kg-RUTEC6WL.woff2",
+    "bytes": 11016,
+    "hash": "5d1bc9b443f3f81fa4b4ad4634c1bb9702194c1898e3a9de0ab5e2cdc0e9f479",
+    "mime": "font/woff2"
+  },
+  {
+    "url": "https://modules.lceda.cn/smt-gl-engine/4.1.33.9acde59c/workerHelpers.js",
+    "file": "d2240ecaf895deb1-workerHelpers.js",
+    "bytes": 14054,
+    "hash": "c5ad8252b5261f37a8087f4029ce0d31f073eee8642c05a8e06cfbfedf380226",
+    "mime": "text/javascript"
+  }
+]
