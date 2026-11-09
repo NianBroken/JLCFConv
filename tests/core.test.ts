@@ -3,12 +3,72 @@ import { describe, expect, test } from 'vitest';
 import { transformUi, transformEngine } from '../src/core/javascript.js';
 import { inspectHtml, escapeHtml } from '../src/core/html.js';
 import { DEFAULT_OPTIONS, COMPANY, optionsSchema } from '../src/shared/config.js';
+import { columns, tableWidth } from '../src/preview/columns.js';
+import { distributeWidths } from '../src/preview/tables.js';
 
 const FIXTURE = `var R=window.React,J=window.jsx;
 var Pane=(0,R.forwardRef)((props,ref)=>{var target="layout-toggler-box_changed";return J("div",{className:target,children:props.children})});
 function Application(){var state=R.useState({});console.error("离线焊接辅助工具数据错误",state);return J("div",{children:[J("a",{className:"open-editor_changed",onClick:()=>location.href="https://editor.example",children:"返回编辑器"}),J("div",{className:"matchingTools-header_changed",children:"顶部"}),J("ul",{className:"smt-preview-header-nav-bar_changed",children:"导出"}),J(Pane,{children:"内容"}),"立创商城元件名","嘉立创库类别","3D图供参考，具体以实物为准"]})}window.Application=Application;`;
 
 describe('动态页面转换', () => {
+  test('带 CSS 引号的百分号编码 SVG 分段提示完整替换', async () => {
+    const svg =
+      '<svg><text><tspan>预览视图</tspan><tspan>仅供参考，具体以实物为准</tspan></text></svg>';
+    const input =
+      FIXTURE +
+      ';window.css=' +
+      JSON.stringify('background:url("data:image/svg+xml,' + encodeURIComponent(svg) + '")') +
+      ';';
+    const output = await transformUi(input, DEFAULT_OPTIONS);
+    expect(decodeURIComponent(output)).toContain(COMPANY);
+    expect(decodeURIComponent(output)).not.toContain('以实物为准');
+  });
+  test('逗号形式的 JSX 工厂保持回调作用域', async () => {
+    const extra =
+      ';window.table=(0,J)("table",{children:(0,J)("colgroup",{children:[0,1,2,3,4,5,6].map(()=>null).concat([(0,J)("col",{width:w[0]}),(0,J)("col",{}),(0,J)("col",{}),(0,J)("col",{}),(0,J)("col",{}),(0,J)("col",{}),(0,J)("col",{})])})});';
+    // 表格使用与生产样本相同的直接列节点。
+    const source = extra
+      .replace('[0,1,2,3,4,5,6].map(()=>null).concat([', '[')
+      .replace('])})});', ']})});');
+    const output = await transformUi(FIXTURE + source, DEFAULT_OPTIONS);
+    expect(output).toContain('.map(column=>J("col",{width:column.width');
+  });
+  test('转义模板与带引号的 SVG 背景使用解码文字替换', async () => {
+    const source =
+      FIXTURE +
+      ';window.background=`"data:image/svg+xml,%3Csvg%3E\\u9884\\u89c8\\u89c6\\u56fe仅供参考，具体以实物为准%3C/svg%3E"`;';
+    const output = await transformUi(source, DEFAULT_OPTIONS);
+    expect(output).toContain(COMPANY);
+    expect(output).not.toContain('供参考');
+    expect(output).not.toContain('以实物为准');
+    const disabled = await transformUi(source, { ...DEFAULT_OPTIONS, optimizePage: false });
+    expect(disabled).toContain('供参考');
+  });
+  test('手机标题只删除界面节点，不替换合法数据', async () => {
+    const source =
+      FIXTURE +
+      ';window.phone=J("div",{className:`${styles.weld_phone_name_panel}`,children:"PCB3"});window.part="PCB3";';
+    const output = await transformUi(source, DEFAULT_OPTIONS);
+    expect(output).toContain('window.phone=null');
+    expect(output).toContain('window.part="PCB3"');
+  });
+  test('显示选项的输入与标签保持同一组', async () => {
+    const output = await transformUi(
+      FIXTURE +
+        ';window.radio=J("div",{className:`${styles.radioArea}`,children:[J("input",{type:"radio",onChange:handler}),J("label",{children:"选项"})]});',
+      DEFAULT_OPTIONS,
+    );
+    expect(output).toContain('jlcf-display-option');
+    expect(output).toContain('onChange:handler');
+  });
+  test('缺失值展示保留零值与真实参数', async () => {
+    const output = await transformUi(
+      FIXTURE +
+        ';window.detail=function(data){return J("p",{className:`${style["coent-right"]}`,children:data.value||"null"})};',
+      DEFAULT_OPTIONS,
+    );
+    expect(output).toContain('data.value??"未提供"');
+  });
   test('跨资源片段删除专用样式并保留其他背景', async () => {
     const output = await transformUi(
       FIXTURE +
@@ -82,6 +142,41 @@ describe('动态页面转换', () => {
   });
   test('必要结构不匹配时明确失败', async () => {
     await expect(transformUi('window.x=1', DEFAULT_OPTIONS)).rejects.toThrow('未匹配完整转换规则');
+  });
+});
+
+describe('表格列的共享规则', () => {
+  test('剩余宽度平均分配且窄容器不会压缩基础列宽', () => {
+    expect(distributeWidths([100, 150, 200], 601)).toEqual([150, 200, 250]);
+    expect(distributeWidths([100, 150, 200], 320)).toEqual([100, 150, 200]);
+    expect(distributeWidths([], 900)).toEqual([]);
+  });
+  const widths = [110, 135, 155, 75, 120, 115, 125, 90];
+  test('手机列按字段重排且不会套用被隐藏列的宽度', () => {
+    const result = columns(widths, true, true);
+    expect(result.map((column) => column.key)).toEqual([
+      'checked',
+      'dataT',
+      'dataB',
+      'dataEle',
+      'dataId',
+      'PCS',
+      'package',
+    ]);
+    expect(result.map((column) => column.width)).toEqual([110, 135, 155, 120, 125, 90, 120]);
+    expect(tableWidth(widths, true, true)).toBe(855);
+    expect(widths).toEqual([110, 135, 155, 75, 120, 115, 125, 90]);
+  });
+  test('非聚合列与聚合列使用各自的字段规则', () => {
+    expect(columns([], false, false).map((column) => column.key)).toEqual([
+      'checked',
+      'Designator',
+      'layer',
+      'value',
+      'dataEle',
+      'package',
+      'componentCode',
+    ]);
   });
 });
 describe('输入与内容保护基础', () => {

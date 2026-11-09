@@ -34,6 +34,7 @@ export async function convertHtml(input: ConvertInput) {
   const protectedHashes = payloads.map((s) => digest(s.code));
   const resources = await loadResources();
   const runtimeCode = await readFile(resolve('dist-server/preview-runtime.js'), 'utf8');
+  const scrollbarStyles = await readFile(resolve('dist-server/preview-runtime.css'), 'utf8');
   const title = options.title.kind === 'filename' ? filename : options.title.text;
   const worker = resources.manifest.find((r) => r.url.endsWith('/workerHelpers.js'))!;
   const settings = {
@@ -81,7 +82,8 @@ export async function convertHtml(input: ConvertInput) {
     );
   finish.overwrite(actualUi.start, actualUi.end, uiWithFonts);
   const styles = validateStyles(
-    logoStyles +
+    scrollbarStyles +
+      logoStyles +
       (options.optimizePage ? pageStyles : '') +
       (options.optimizeInteraction ? interactionStyles : ''),
   );
@@ -103,6 +105,7 @@ export async function convertHtml(input: ConvertInput) {
       `网站标题：${title}`,
       '引擎、字体与线程资源内嵌',
       '离线初始化与元件查询逻辑',
+      '统一悬浮滚动条，轨道不占布局空间',
       ...(options.optimizePage
         ? ['页面头部与目标导航清理', '参数字段名称替换', `提示文案：${COMPANY}`, '窄屏头部自动排版']
         : []),

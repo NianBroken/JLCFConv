@@ -1,5 +1,5 @@
 import { parse } from '@babel/parser';
-import traverseImport from '@babel/traverse';
+import traverseImport, { type NodePath } from '@babel/traverse';
 import * as t from '@babel/types';
 import MagicString from 'magic-string';
 import postcss from 'postcss';
@@ -23,6 +23,7 @@ const TEXT_CHANGES = new Map([
 const NOTICE = /(?:3D\s*图|预览视图|3D\s*视图)(?:仅)?供参考[，,\s]*具体以实物为准/g;
 const ENGLISH_NOTICE =
   /(?:the\s*)?3d\s*(?:p?review|view)\s*(?:is\s*)?(?:only\s*)?for reference(?:\s*only)?/gi;
+const SVG_RESOURCE = /data:image\/svg\+xml(?:;[\w=.-]+)*,[^\s"'()]+/gi;
 interface Edit {
   start: number;
   end: number;
@@ -30,21 +31,21 @@ interface Edit {
 }
 
 /** SVG 内的分段文字作为一个显示标签处理，保留图像尺寸与背景。 */
-function replaceNotice(value: string) {
+function replaceNotice(value: string): string {
   const replace = (text: string) => text.replace(NOTICE, COMPANY).replace(ENGLISH_NOTICE, COMPANY);
-  if (!value.startsWith('data:image/svg+xml')) return replace(value);
+  if (!value.startsWith('data:image/svg+xml'))
+    return replace(value.replace(SVG_RESOURCE, (resource) => replaceNotice(resource)));
   const comma = value.indexOf(',');
   const prefix = value.slice(0, comma + 1);
   const base64 = prefix.includes(';base64');
   const svg = base64
     ? Buffer.from(value.slice(comma + 1), 'base64').toString('utf8')
     : decodeURIComponent(value.slice(comma + 1));
-  const transformed = svg.replace(
-    /(<text\b[^>]*>)([\s\S]*?)(<\/text>)/gi,
-    (whole, start, content, end) => {
+  const transformed = replace(
+    svg.replace(/(<text\b[^>]*>)([\s\S]*?)(<\/text>)/gi, (whole, start, content, end) => {
       const visible = content.replace(/<[^>]*>/g, '').replace(/\s+/g, '');
       return replace(visible).includes(COMPANY) ? `${start}${COMPANY}${end}` : whole;
-    },
+    }),
   );
   return transformed === svg
     ? value
@@ -65,7 +66,10 @@ function applyEdits(source: string, edits: Edit[]) {
     selected.push(edit);
   }
   const result = new MagicString(source);
-  for (const edit of selected) result.overwrite(edit.start, edit.end, edit.text);
+  for (const edit of selected) {
+    if (edit.start === edit.end) result.appendLeft(edit.start, edit.text);
+    else result.overwrite(edit.start, edit.end, edit.text);
+  }
   return result.toString();
 }
 function nodeText(source: string, node: t.Node) {
@@ -89,6 +93,106 @@ function hasSemantic(node: t.Node, value: string) {
   return found;
 }
 
+/** JSX 属性通过名称提取，打包变量及属性顺序不参与匹配。 */
+function property(object: t.ObjectExpression, name: string) {
+  return object.properties.find(
+    (item): item is t.ObjectProperty =>
+      t.isObjectProperty(item) &&
+      (t.isIdentifier(item.key, { name }) || t.isStringLiteral(item.key, { value: name })),
+  );
+}
+
+/** 显示结构的源区间修改与原组件的事件、数据和状态分离。 */
+function displayCall(path: NodePath<t.CallExpression>, source: string, edits: Edit[]) {
+  const node = path.node;
+  const props = node.arguments[1];
+  if (!t.isObjectExpression(props)) return;
+  const className = property(props, 'className')?.value;
+  const children = property(props, 'children')?.value;
+  const replace = (target: t.Node, text: string) =>
+    edits.push({ start: target.start!, end: target.end!, text });
+  const jsx = `(${nodeText(source, node.callee)})`;
+  if (className && hasSemantic(className, 'weld_phone_name_panel')) {
+    replace(node, 'null');
+    return;
+  }
+  // 每个选项是独立 label，输入和文字作为同一组参与换行。
+  if (
+    className &&
+    t.isArrayExpression(children) &&
+    (hasSemantic(className, 'radioArea') || hasSemantic(className, 'radioArea_item'))
+  ) {
+    const values = children.elements.filter((item): item is t.Expression => t.isExpression(item));
+    const output: string[] = [];
+    for (let index = 0; index < values.length; index++) {
+      const input = values[index],
+        label = values[index + 1];
+      if (
+        t.isCallExpression(input) &&
+        t.isStringLiteral(input.arguments[0], { value: 'input' }) &&
+        t.isCallExpression(label) &&
+        t.isStringLiteral(label.arguments[0], { value: 'label' }) &&
+        t.isObjectExpression(label.arguments[1])
+      ) {
+        const text = property(label.arguments[1], 'children')!.value;
+        output.push(
+          `${jsx}("label",{className:"jlcf-display-option",children:[${nodeText(source, input)},${jsx}("span",{children:${nodeText(source, text)}})]})`,
+        );
+        index++;
+      } else output.push(nodeText(source, input));
+    }
+    replace(children, `[${output.join(',')}]`);
+  }
+  if (
+    !t.isStringLiteral(node.arguments[0], { value: 'colgroup' }) ||
+    !t.isArrayExpression(children)
+  )
+    return;
+  let widths: t.MemberExpression | undefined;
+  let count = 0;
+  t.traverseFast(children, (part) => {
+    if (t.isCallExpression(part) && t.isStringLiteral(part.arguments[0], { value: 'col' })) count++;
+    if (
+      !widths &&
+      t.isMemberExpression(part) &&
+      part.computed &&
+      t.isNumericLiteral(part.property, { value: 0 })
+    )
+      widths = part;
+  });
+  if (!widths || count < 7) return;
+  const aggregate = count >= 8;
+  const owner = path.getFunctionParent();
+  let phone = 'false';
+  if (aggregate && owner)
+    t.traverseFast(owner.node, (part) => {
+      if (t.isMemberExpression(part) && t.isIdentifier(part.property, { name: 'isShowOnPhone' }))
+        phone = nodeText(source, part);
+    });
+  const array = nodeText(source, widths.object);
+  const argumentsText = `${array},${phone},${aggregate}`;
+  replace(
+    node,
+    `${jsx}("colgroup",{children:window.__JLCFConv.columns(${argumentsText}).map(column=>${jsx}("col",{width:column.width,"data-column":column.key},column.key))})`,
+  );
+  const table = path.findParent(
+    (parent) =>
+      parent.isCallExpression() && t.isStringLiteral(parent.node.arguments[0], { value: 'table' }),
+  );
+  if (table?.isCallExpression() && t.isObjectExpression(table.node.arguments[1])) {
+    const tableProps = table.node.arguments[1];
+    const style = property(tableProps, 'style');
+    const widthStyle = `width:"max(100%, "+window.__JLCFConv.tableWidth(${argumentsText})+"px)",tableLayout:"fixed"`;
+    if (style) replace(style.value, `{...(${nodeText(source, style.value)}),${widthStyle}}`);
+    const position = tableProps.start! + 1;
+    edits.push({
+      start: position,
+      end: position,
+      text: `"data-jlcf-table":"${aggregate ? 'aggregate' : 'individual'}",${style ? '' : `style:{${widthStyle}},`}`,
+    });
+  }
+}
+
 /** 使用组件属性识别动态界面，不依赖打包后的变量名称或 class 散列。 */
 export async function transformUi(source: string, options: ConversionOptions) {
   const key = `ui:${digest(source)}:${options.optimizePage}:${options.optimizeInteraction}`;
@@ -107,6 +211,7 @@ export async function transformUi(source: string, options: ConversionOptions) {
   traverse(tree, {
     CallExpression(path) {
       const node = path.node;
+      if (options.optimizePage) displayCall(path, source, edits);
       // CSS 资源由连续 push 拼成完整样式，资源占位符使 URL 与所属规则一起清理。
       if (
         options.optimizePage &&
@@ -259,6 +364,15 @@ export async function transformUi(source: string, options: ConversionOptions) {
     StringLiteral(path) {
       const node = path.node;
       if (options.optimizePage) {
+        if (
+          node.value === 'null' &&
+          t.isLogicalExpression(path.parent, { operator: '||' }) &&
+          path.parent.right === node &&
+          hasSemantic(path.getFunctionParent()?.node ?? node, 'coent-right')
+        ) {
+          edit(path.parent, `(${nodeText(source, path.parent.left)}??"未提供")`);
+          return;
+        }
         let value = TEXT_CHANGES.get(node.value) ?? replaceNotice(node.value);
         if (
           /\.(?:matchingTools-header|smt-preview-header-nav-bar|open-editor|driver)_/.test(value)
@@ -290,8 +404,37 @@ export async function transformUi(source: string, options: ConversionOptions) {
     },
     TemplateElement(path) {
       if (!options.optimizePage) return;
-      const value = path.node.value.raw.replace(NOTICE, COMPANY);
-      if (value !== path.node.value.raw) edit(path.node, value);
+      const cooked = path.node.value.cooked;
+      if (cooked === null || cooked === undefined) return;
+      const value = replaceNotice(cooked);
+      if (value !== cooked)
+        edit(path.node, value.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${'));
+    },
+    AssignmentExpression(path) {
+      if (!options.optimizePage) return;
+      const node = path.node;
+      if (
+        t.isMemberExpression(node.left) &&
+        t.isIdentifier(node.left.property, { name: 'scrollTop' }) &&
+        /\.parentNode(?:\.parentNode){2,}/.test(nodeText(source, node.left)) &&
+        t.isMemberExpression(node.right) &&
+        t.isIdentifier(node.right.property, { name: 'offsetTop' })
+      )
+        edit(node, `window.__JLCFConv.revealRow(${nodeText(source, node.right.object)})`);
+    },
+    FunctionDeclaration(path) {
+      const node = path.node;
+      const body = nodeText(source, node.body);
+      if (!body.includes('rpcCall("/engine/model/setModelChecked"')) return;
+      const statement = node.body.body[0];
+      if (!t.isExpressionStatement(statement) || !t.isCallExpression(statement.expression)) return;
+      const call = statement.expression;
+      const id = node.params[0];
+      if (!t.isIdentifier(id)) return;
+      edit(
+        node.body,
+        `{return ${nodeText(source, call.callee)}("/engine/model/canHighlight",[${id.name}]).then(result=>result.message===true?${nodeText(source, call)}:undefined)}`,
+      );
     },
   });
   if (
@@ -329,6 +472,33 @@ export function transformEngine(source: string, resources: ResourceBundle) {
   const edit = (node: t.Node, text: string) =>
     edits.push({ start: node.start!, end: node.end!, text });
   traverse(tree, {
+    NewExpression(path) {
+      if (t.isIdentifier(path.node.callee, { name: 'OffscreenCanvas' }))
+        edit(
+          path.node,
+          `window.__JLCFConv.createRenderCanvas(${path.node.arguments.map((argument) => nodeText(source, argument)).join(',')})`,
+        );
+    },
+    BinaryExpression(path) {
+      if (
+        path.node.operator === 'instanceof' &&
+        t.isIdentifier(path.node.right, { name: 'OffscreenCanvas' })
+      )
+        edit(path.node, `(typeof OffscreenCanvas!=="undefined"&&${nodeText(source, path.node)})`);
+    },
+    CallExpression(path) {
+      const node = path.node;
+      if (
+        !t.isStringLiteral(node.arguments[0], { value: '/engine/model/setModelChecked' }) ||
+        !t.isMemberExpression(node.callee) ||
+        !t.isIdentifier(node.callee.property, { name: 'rpcService' })
+      )
+        return;
+      edit(
+        node,
+        `(${nodeText(source, node.callee)}("/engine/model/canHighlight",([id])=>{if(typeof id!=="string"||!id)throw new TypeError("元件标识无效");return Boolean(this.modelIndex[id])}),${nodeText(source, node)})`,
+      );
+    },
     StringLiteral(path) {
       const resource = resources.manifest.find((r) => r.url === path.node.value);
       if (resource)

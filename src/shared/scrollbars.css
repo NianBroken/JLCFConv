@@ -1,0 +1,43 @@
+@import 'overlayscrollbars/overlayscrollbars.css';
+
+/* 悬浮轨道不预留布局空间，滑块与操作区域共用统一主题。 */
+.jlcf-scrollbar {
+  --os-size: 12px;
+  --os-padding-perpendicular: 4px;
+  --os-padding-axis: 3px;
+  --os-track-border-radius: 999px;
+  --os-track-bg: transparent;
+  --os-track-bg-hover: transparent;
+  --os-track-bg-active: transparent;
+  --os-handle-border-radius: 999px;
+  --os-handle-bg: #8da0b680;
+  --os-handle-bg-hover: #6b88a8b3;
+  --os-handle-bg-active: #396da8;
+  --os-handle-min-size: 24px;
+  --os-handle-perpendicular-size: 4px;
+  --os-handle-perpendicular-size-hover: 4px;
+  --os-handle-perpendicular-size-active: 4px;
+  --os-handle-interactive-area-offset: 2px;
+  z-index: 15;
+}
+/* 主题盒模型固定为边框盒，页面通用 div 规则不参与轨道尺寸计算。 */
+.jlcf-scrollbar,
+.jlcf-scrollbar * {
+  box-sizing: border-box !important;
+}
+[data-overlayscrollbars-viewport] {
+  scrollbar-width: none !important;
+  scrollbar-gutter: auto !important;
+}
+[data-overlayscrollbars-viewport]::-webkit-scrollbar,
+html[data-overlayscrollbars-body]::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+@media (pointer: coarse) {
+  .jlcf-scrollbar {
+    --os-size: 20px;
+    --os-padding-perpendicular: 8px;
+  }
+}

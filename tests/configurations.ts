@@ -31,6 +31,7 @@ try {
     [0, false, false, false],
     [1, true, false, true],
     [2, false, true, false],
+    [3, true, true, false],
   ] as const) {
     await page.getByRole('switch', { name: '优化网页', exact: true }).setChecked(optimizePage);
     await page
@@ -51,7 +52,11 @@ try {
       await page.locator('.logo-upload img').waitFor();
     } else {
       await page.getByRole('button', { name: '文字 LOGO', exact: true }).click();
-      await page.getByLabel('LOGO 文字').fill('勤奋 <展示> & PCB');
+      await page
+        .getByLabel('LOGO 文字')
+        .fill(
+          index === 3 ? '中山勤奋光电PCB模型预览与完整电路板展示'.repeat(4) : '勤奋 <展示> & PCB',
+        );
     }
     const promised = page.waitForEvent('download', { timeout: 300000 });
     await page.getByRole('button', { name: '转换并下载', exact: true }).click();
@@ -84,12 +89,47 @@ try {
           'data:image/png;base64,',
         ),
       );
-    else assert.equal(await preview.locator('.jlcf-logo').innerText(), '勤奋 <展示> & PCB');
+    else
+      assert.equal(
+        await preview.locator('.jlcf-logo').innerText(),
+        index === 3 ? '中山勤奋光电PCB模型预览与完整电路板展示'.repeat(4) : '勤奋 <展示> & PCB',
+      );
+    assert((await preview.locator('.os-scrollbar').count()) > 0);
     const originalUrl = preview.url();
     await preview.locator('.jlcf-logo').click();
     await preview.locator('.jlcf-logo').dblclick();
     assert.equal(preview.url(), originalUrl);
     await preview.screenshot({ path: join(output, `configuration-${index}.png`) });
+    if (optimizePage) {
+      await preview.setViewportSize({ width: 320, height: 844 });
+      const logo = (await preview.locator('.jlcf-logo').boundingBox())!;
+      assert(logo.x >= 0 && logo.x + logo.width <= 321);
+      if (image) {
+        const box = (await preview.locator('.jlcf-logo img').boundingBox())!;
+        assert(box.x + box.width <= 321);
+      }
+      await preview.screenshot({ path: join(output, `configuration-${index}-narrow.png`) });
+      const mobile = await browser.newContext({
+        offline: true,
+        isMobile: true,
+        hasTouch: true,
+        viewport: { width: 320, height: 844 },
+        userAgent:
+          'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36',
+      });
+      const phone = await mobile.newPage();
+      await phone.goto(pathToFileURL(file).href);
+      await phone.locator('.jlcf-logo-mobile').waitFor();
+      const mobileLogo = (await phone.locator('.jlcf-logo-mobile').boundingBox())!;
+      const hamburger = (await phone.locator('#showDialog').boundingBox())!;
+      assert(mobileLogo.x + mobileLogo.width <= hamburger.x);
+      if (image) {
+        const box = (await phone.locator('.jlcf-logo img').boundingBox())!;
+        assert(box.x + box.width <= hamburger.x);
+      }
+      await phone.screenshot({ path: join(output, `configuration-${index}-phone.png`) });
+      await mobile.close();
+    }
     assert.deepEqual(errors, []);
     results.push({ optimizePage, optimizeInteraction, image, errors });
     await offline.close();

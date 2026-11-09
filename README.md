@@ -10,6 +10,8 @@ JLCFConv 是用于嘉立创 PCB 3D 离线 HTML 的浏览器转换工具。作者
 - 网站标题默认使用各自原始文件名，包含扩展名，也可统一填写文字。
 - 网页优化默认开启，删除指定头部和导航，处理相关事件与样式，修改参数标签、SVG 提示，并重排窄屏头部。
 - 交互优化默认开启，使用 Pointer Events 支持侧栏展开、收起和拖动。按钮至少 44 × 44 像素，拖动区域至少 24 像素。
+- 工具与输出 HTML 使用同一套悬浮滚动条，可见滑块始终为 4 像素，透明操作区域支持鼠标与触摸，轨道不占内容宽度。
+- 网页优化按可见字段同步表头与数据列，剩余宽度平均分配到各列，长位号、型号和封装在末尾显示省略号。手机菜单使用紧凑间距，视图切换与头部保留分隔。
 - WASM、字体和线程辅助代码保存在输出内部。下载结果支持断网直接打开。HTTPS 预览采用独立端口和跨源隔离，浏览器允许时使用 Rust 多线程。Rust 线程预算按设备能力计算，上限为 4。
 - 输入副本与结果分离，原始设备文件不会被覆盖。每份输出都核对 PCB、BOM 和模型数据脚本的 SHA-256。
 - 支持单文件失败报告、部分成功、取消任务、上传重试、结果重新下载、会话隔离和过期清理。
@@ -62,20 +64,20 @@ npm run resources -- "C:\样本位置\模型.html"
 
 环境变量均为可选项。容量和时间值使用正整数。
 
-| 环境变量 | 默认值与作用 |
-| --- | --- |
-| `PORT` | 工具端口 3443 |
-| `PREVIEW_PORT` | 预览端口 3444 |
-| `JLCF_TLS_DIR` | `%ProgramData%\JLCFConv\tls` |
-| `JLCF_DATA_DIR` | 项目 `.runtime/data` |
-| `JLCF_WORKERS` | 按 CPU 和可用内存计算，默认上限 4 |
-| `JLCF_MAX_FILE_BYTES` | 单份 134217728 字节 |
-| `JLCF_MAX_BATCH_BYTES` | 每批 1073741824 字节 |
-| `JLCF_MAX_FILES` | 每批 32 份 |
-| `JLCF_MAX_LOGO_BYTES` | LOGO 8388608 字节 |
-| `JLCF_MAX_LOGO_PIXELS` | 静态 LOGO 最长边 4096 像素 |
-| `JLCF_RETENTION_MS` | 结果保留 3600000 毫秒 |
-| `JLCF_TIMEOUT_MS` | 单份转换超时 300000 毫秒 |
+| 环境变量               | 默认值与作用                      |
+| ---------------------- | --------------------------------- |
+| `PORT`                 | 工具端口 3443                     |
+| `PREVIEW_PORT`         | 预览端口 3444                     |
+| `JLCF_TLS_DIR`         | `%ProgramData%\JLCFConv\tls`      |
+| `JLCF_DATA_DIR`        | 项目 `.runtime/data`              |
+| `JLCF_WORKERS`         | 按 CPU 和可用内存计算，默认上限 4 |
+| `JLCF_MAX_FILE_BYTES`  | 单份 134217728 字节               |
+| `JLCF_MAX_BATCH_BYTES` | 每批 1073741824 字节              |
+| `JLCF_MAX_FILES`       | 每批 32 份                        |
+| `JLCF_MAX_LOGO_BYTES`  | LOGO 8388608 字节                 |
+| `JLCF_MAX_LOGO_PIXELS` | 静态 LOGO 最长边 4096 像素        |
+| `JLCF_RETENTION_MS`    | 结果保留 3600000 毫秒             |
+| `JLCF_TIMEOUT_MS`      | 单份转换超时 300000 毫秒          |
 
 前端通过 `/api/capabilities` 读取有效限制。活动转换与下载不会被过期清理器移除。服务重启后的无引用副本也按照保留期限清理。
 
@@ -98,8 +100,16 @@ npx tsx tests/edge-flows.ts
 npx tsx tests/offline-all.ts
 npx tsx tests/engine-modes.ts
 npx tsx tests/upload-boundaries.ts
+npx tsx tests/prepare-display.ts
+npx tsx tests/single-download.ts
+npm run test:display
+npm run test:compatibility
+npm run test:layout
+npm run test:tables
 ```
 
 `tests/touch.ts` 和 `tests/panels.ts` 使用 `JLCF_TEST_JOB` 指定真实转换任务，使用 `JLCF_TEST_INDEX` 指定其文件下标。前者覆盖 320、390、768、1024、1440 像素，后者检查左右侧栏、手机底栏、取消拖动、参数详情和屏幕旋转。
 
 测试输出在 `test-results`，包括实际下载的 HTML、ZIP、截图和 JSON 报告。原样基线保留原始错误；转换结果保留正常运算诊断，不覆盖或屏蔽 console。最终核验记录见 `docs/验收报告.md`。
+
+显示、滚动、菜单与表格的核验记录见 `docs/显示与交互验收.md`。已下载的 HTML 内容独立保存，使用完整界面规则时需保持“优化网页”开启并重新转换原始文件。

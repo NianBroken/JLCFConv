@@ -34,6 +34,8 @@ import {
   type JobInfo,
 } from '../shared/config';
 import './styles.css';
+import '../shared/scrollbars.css';
+import { manageScrollbars } from '../shared/scrollbars';
 
 interface QueueFile {
   key: string;
@@ -52,6 +54,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 }
 /** 原始 File 对象只用于上传与显示，任何操作都不具备回写设备文件的能力。 */
 function App() {
+  useEffect(() => manageScrollbars(), []);
   const [files, setFiles] = useState<QueueFile[]>([]);
   const [options, setOptions] = useState<ConversionOptions>(structuredClone(DEFAULT_OPTIONS));
   const [logoKind, setLogoKind] = useState<'text' | 'image'>('text');

@@ -68,6 +68,8 @@ try {
   const body = await page.locator('body').innerText();
   assert(body.includes('元件名') && body.includes('库类别'));
   assert(!body.includes('立创商城元件名') && !body.includes('嘉立创库类别'));
+  assert(body.includes('未提供'));
+  assert(!/(?:^|\n)\s*(?:null|undefined|\[object Object\])\s*(?:\n|$)/.test(body));
   await page.screenshot({ path: resolve('test-results/parameter-details.png') });
   assert.equal(errors.length, 0, errors.join('\n'));
   const phone = await browser.newContext({
