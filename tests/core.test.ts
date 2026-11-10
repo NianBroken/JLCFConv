@@ -72,7 +72,7 @@ describe('动态页面转换', () => {
   test('跨资源片段删除专用样式并保留其他背景', async () => {
     const output = await transformUi(
       FIXTURE +
-        ';window.sheet=(()=>{var pieces=[];pieces.push(".smt-preview-header-nav-bar_changed .icon{background:url(");pieces.push(JSON.stringify("https://private.example/icon.svg"));pieces.push(")}.kept{color:blue}");return pieces.join("")})();',
+        ';window.sheet=(()=>{var pieces=[];pieces.push(".matchingTools-header_changed .icon{background:url(");pieces.push(JSON.stringify("https://private.example/icon.svg"));pieces.push(")}.kept{color:blue}");return pieces.join("")})();',
       DEFAULT_OPTIONS,
     );
     expect(output).not.toContain('private.example');
@@ -98,7 +98,7 @@ describe('动态页面转换', () => {
     expect(output).not.toContain('editor.example');
     expect(output).not.toContain('返回编辑器');
     expect(output).not.toContain('matchingTools-header_changed');
-    expect(output).not.toContain('smt-preview-header-nav-bar_changed');
+    expect(output).toContain('smt-preview-header-nav-bar_changed');
     expect(output).toContain('window.__JLCFConv.sidebar');
     expect(output).toContain('window.files||{}');
     expect(output).toContain(COMPANY);
@@ -107,7 +107,7 @@ describe('动态页面转换', () => {
   test('删除专用选择器时保留共享样式声明', async () => {
     const output = await transformUi(
       FIXTURE +
-        ';window.css=".smt-preview-header-nav-bar_changed .nav-bar-item_changed,.nav-bar-header_kept{display:flex}.nav-bar-item_other{padding:8px}";',
+        ';window.css=".matchingTools-header_changed .nav-bar-item_changed,.nav-bar-header_kept{display:flex}.nav-bar-item_other{padding:8px}";',
       DEFAULT_OPTIONS,
     );
     expect(output).toContain('.nav-bar-header_kept{display:flex}');

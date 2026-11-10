@@ -1,5 +1,6 @@
 /** 界面间距、空余列宽和单行省略使用实际下载结果进行量测与截图。 */
-import { chromium, firefox, webkit } from 'playwright';
+import { firefox, webkit } from 'playwright';
+import { launchBrowser } from './browser.js';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -20,7 +21,7 @@ const browser =
     ? await firefox.launch()
     : engine === 'webkit'
       ? await webkit.launch()
-      : await chromium.launch({ channel: engine });
+      : await launchBrowser(engine);
 const records: unknown[] = [];
 const failures: string[] = [];
 const errors: string[] = [];

@@ -2,6 +2,10 @@ import { manageScrollbars } from '../shared/scrollbars';
 import { columns, tableWidth } from './columns';
 import { createRenderCanvas } from './canvas';
 import { manageTables } from './tables';
+import { createSelection } from './selection';
+import { createDiagnostics } from './diagnostics';
+import { createDrawing } from './drawing';
+import { createGeometry } from './geometry';
 
 /**
  * 输出 HTML 内部的静态展示和侧栏能力。
@@ -14,7 +18,15 @@ export function installRuntime(settings: {
   optimizeInteraction: boolean;
   worker: string;
 }) {
-  const runtimeWindow = window as typeof window & { __JLCFConv?: unknown };
+  const runtimeWindow = window as typeof window & {
+    __JLCFConv?: unknown;
+    __JLCFDiagnostics?: unknown;
+  };
+  const diagnostics = createDiagnostics();
+  const geometry = createGeometry(diagnostics.reportError);
+  const selection = createSelection(diagnostics.reportError, geometry);
+  const drawing = createDrawing(diagnostics.reportError);
+  runtimeWindow.__JLCFDiagnostics = diagnostics;
   const objectUrls: string[] = [];
   let disposeScrollbars: (() => void) | undefined;
   let disposeTables: (() => void) | undefined;
@@ -35,6 +47,10 @@ export function installRuntime(settings: {
     () => {
       disposeScrollbars?.();
       disposeTables?.();
+      diagnostics.dispose();
+      drawing.dispose();
+      selection.dispose();
+      geometry.dispose();
       objectUrls.splice(0).forEach((url) => URL.revokeObjectURL(url));
     },
     { once: true },
@@ -64,8 +80,9 @@ export function installRuntime(settings: {
     );
     const [compact, setCompact] = React.useState(narrow);
     const box = React.useRef<HTMLDivElement>(null);
-    const drag = React.useRef<{ id: number; x: number; y: number; size: number } | null>(null);
+    const toggleButton = React.useRef<HTMLButtonElement>(null);
     const buttonPointer = React.useRef('mouse');
+    const drag = React.useRef<{ id: number; x: number; y: number; size: number } | null>(null);
     const bottom = props.type === 'bottom' || props.type === 'top';
     const clamp = (value: number) => {
       const container = box.current?.parentElement?.parentElement;
@@ -112,6 +129,16 @@ export function installRuntime(settings: {
       props.onToggle?.(next);
     };
     React.useImperativeHandle(forwardedRef, () => ({ emitToggle: toggle }));
+    React.useEffect(() => {
+      const element = toggleButton.current;
+      // 触摸结束取消兼容点击，按钮位置变化不会使点击命中下层表格或画布。
+      const touchEnd = (event: TouchEvent) => {
+        event.preventDefault();
+        event.stopPropagation();
+      };
+      element?.addEventListener('touchend', touchEnd, { passive: false });
+      return () => element?.removeEventListener('touchend', touchEnd);
+    }, []);
     React.useEffect(() => {
       const resize = () => {
         setCompact(narrow());
@@ -165,24 +192,29 @@ export function installRuntime(settings: {
         'button',
         {
           type: 'button',
+          ref: toggleButton,
           className: 'jlcf-pane-toggle',
           title: `${opened ? '收起' : '展开'}${props.title}`,
           'aria-label': `${opened ? '收起' : '展开'}${props.title}`,
           'aria-expanded': opened,
           onPointerDown: (event: import('react').PointerEvent<HTMLButtonElement>) => {
             buttonPointer.current = event.pointerType;
+            event.stopPropagation();
             if (event.pointerType !== 'mouse') {
               event.preventDefault();
               event.currentTarget.setPointerCapture(event.pointerId);
             }
           },
           onPointerUp: (event: import('react').PointerEvent<HTMLButtonElement>) => {
+            event.stopPropagation();
             if (event.pointerType !== 'mouse') {
               event.preventDefault();
               toggle();
             }
           },
           onClick: (event: import('react').MouseEvent<HTMLButtonElement>) => {
+            event.preventDefault();
+            event.stopPropagation();
             if (event.detail === 0 || buttonPointer.current === 'mouse') toggle();
           },
         },
@@ -237,16 +269,7 @@ export function installRuntime(settings: {
     );
   }
   /** 行定位使用实际滚动视口，界面嵌套层级不参与滚动目标判断。 */
-  const revealRow = (row: HTMLElement) => {
-    const viewport = row.closest<HTMLElement>(
-      '[class*="bom-table-MatchingTools_"],[class*="coordinate-container_"]',
-    );
-    if (viewport)
-      viewport.scrollTop +=
-        row.getBoundingClientRect().top -
-        viewport.getBoundingClientRect().top -
-        (viewport.querySelector('thead')?.getBoundingClientRect().height ?? 0);
-  };
+  const revealRow = selection.revealRow;
   runtimeWindow.__JLCFConv = {
     sidebar,
     workerUrl,
@@ -255,6 +278,11 @@ export function installRuntime(settings: {
     tableWidth,
     revealRow,
     createRenderCanvas,
+    selection,
+    geometry,
+    drawing,
+    diagnostics,
+    createWorker: diagnostics.createWorker,
   };
   document.title = settings.title;
 }

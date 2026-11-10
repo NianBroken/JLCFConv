@@ -1,11 +1,11 @@
 /** 表格的搜索、排序、焊接勾选和列宽拖动均使用真实浏览器输入。 */
-import { chromium } from 'playwright';
+import { launchBrowser } from './browser.js';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { writeFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 
-const browser = await chromium.launch({ channel: 'chrome' });
+const browser = await launchBrowser();
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, offline: true });
 const errors: string[] = [];
 const results: Record<string, unknown> = {};

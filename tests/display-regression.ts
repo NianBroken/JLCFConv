@@ -2,7 +2,8 @@
  * 显示回归使用真实输出文件和浏览器原生输入。
  * 量测覆盖列边界、滚动视口、悬浮轨道、触控尺寸和页面提示。
  */
-import { chromium, type Page, type BrowserContext } from 'playwright';
+import type { Page, BrowserContext } from 'playwright';
+import { launchBrowser } from './browser.js';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -12,10 +13,7 @@ const DIRECTORY = resolve(process.env.JLCF_DISPLAY_RESULTS ?? 'test-results/disp
 const FILE = process.env.JLCF_DISPLAY_FILE ?? join(DIRECTORY, '中山勤奋光电图片传输模块.html');
 const PHONE_UA =
   'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36';
-const browser = await chromium.launch({
-  channel: process.env.JLCF_BROWSER ?? 'chrome',
-  headless: true,
-});
+const browser = await launchBrowser(process.env.JLCF_BROWSER ?? 'chrome');
 const records: unknown[] = [];
 const failures: string[] = [];
 const errors: string[] = [];

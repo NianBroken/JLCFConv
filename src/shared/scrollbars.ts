@@ -51,6 +51,14 @@ export function manageScrollbars(root: HTMLElement = document.body) {
   };
   const observer = new MutationObserver((mutations) => {
     for (const mutation of mutations) {
+      // 延迟样式表会让现有容器获得滚动能力，样式变化统一触发一次增量批处理。
+      if (document.head.contains(mutation.target)) {
+        pending.add(root);
+        continue;
+      }
+      // React 会在布局状态改变时赋予滚动能力，发现范围只限变化节点。
+      if (mutation.type === 'attributes' && mutation.target instanceof HTMLElement)
+        pending.add(mutation.target);
       for (const node of mutation.addedNodes)
         if (node instanceof HTMLElement && !node.matches('.os-scrollbar,.os-scrollbar *'))
           pending.add(node);
@@ -59,9 +67,27 @@ export function manageScrollbars(root: HTMLElement = document.body) {
       frame = requestAnimationFrame(flush);
   });
   flush();
-  observer.observe(root, { childList: true, subtree: true });
+  observer.observe(root, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['class', 'style'],
+  });
+  observer.observe(document.head, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+    attributes: true,
+    attributeFilter: ['href', 'media', 'disabled'],
+  });
+  const refreshStyles = () => {
+    pending.add(root);
+    if (!frame) frame = requestAnimationFrame(flush);
+  };
+  document.addEventListener('load', refreshStyles, true);
   return () => {
     observer.disconnect();
+    document.removeEventListener('load', refreshStyles, true);
     cancelAnimationFrame(frame);
     instances.forEach((instance) => instance.destroy());
     instances.clear();

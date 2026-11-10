@@ -1,5 +1,5 @@
 import { parse } from '@babel/parser';
-import traverseImport, { type NodePath } from '@babel/traverse';
+import { type NodePath } from '@babel/traverse';
 import * as t from '@babel/types';
 import MagicString from 'magic-string';
 import postcss from 'postcss';
@@ -7,15 +7,15 @@ import { minify } from 'terser';
 import { COMPANY, type ConversionOptions } from '../shared/config.js';
 import { digest, scriptJson } from './html.js';
 import type { ResourceBundle } from './resources.js';
+import { adaptInteractions } from './interactions.js';
+import { adaptDiagnostics } from './diagnostics.js';
+import { traverse } from './ast.js';
+import { adaptToolbar } from './toolbar.js';
+import { adaptGeometry } from './geometry.js';
 
-const traverse =
-  typeof traverseImport === 'function'
-    ? traverseImport
-    : (traverseImport as unknown as { default: typeof traverseImport }).default;
 const cache = new Map<string, string>();
 const RUST_MAX_THREADS = 4;
-const PRIVATE_SELECTOR =
-  /\.(?:matchingTools-header|smt-preview-header-nav-bar|smt-preview-header-nav-disabled|open-editor|driver)_/;
+const PRIVATE_SELECTOR = /\.(?:matchingTools-header|open-editor)_/;
 const TEXT_CHANGES = new Map([
   ['立创商城元件名', '元件名'],
   ['嘉立创库类别', '库类别'],
@@ -208,6 +208,11 @@ export async function transformUi(source: string, options: ConversionOptions) {
     initializations = 0;
   const edit = (node: t.Node, text: string) =>
     edits.push({ start: node.start!, end: node.end!, text });
+  const connected = adaptInteractions(tree, source, edit, options.optimizePage);
+  if (source.includes('/engine/leftClick') && connected !== 1)
+    throw new Error('模型选择订阅未完整匹配，文件未输出。');
+  adaptDiagnostics(tree, source, edit);
+  adaptToolbar(tree, source, edit);
   traverse(tree, {
     CallExpression(path) {
       const node = path.node;
@@ -284,19 +289,6 @@ export async function transformUi(source: string, options: ConversionOptions) {
           return;
         }
       }
-      // 坐标显示属于被删除的头部，相关事件注册与其界面一并移除。
-      if (
-        options.optimizePage &&
-        node.arguments.some(
-          (argument) =>
-            t.isFunction(argument) &&
-            hasSemantic(argument, 'canvasX') &&
-            hasSemantic(argument, 'canvasY'),
-        )
-      ) {
-        edit(node, 'void 0');
-        return;
-      }
       const props = node.arguments[1];
       if (t.isObjectExpression(props)) {
         const className = props.properties.find(
@@ -320,7 +312,6 @@ export async function transformUi(source: string, options: ConversionOptions) {
             headers++;
           }
           if (options.optimizePage && hasSemantic(className.value, 'smt-preview-header-nav-bar')) {
-            edit(node, 'null');
             navigations++;
           }
         }
@@ -374,18 +365,11 @@ export async function transformUi(source: string, options: ConversionOptions) {
           return;
         }
         let value = TEXT_CHANGES.get(node.value) ?? replaceNotice(node.value);
-        if (
-          /\.(?:matchingTools-header|smt-preview-header-nav-bar|open-editor|driver)_/.test(value)
-        ) {
+        if (PRIVATE_SELECTOR.test(value)) {
           value = value.replace(/([^{}]+)\{([^{}]*)\}/g, (whole, selectors, declarations) => {
             const rule = postcss.parse(selectors + '{' + declarations + '}').first;
             if (!rule || rule.type !== 'rule') return whole;
-            const retained = rule.selectors.filter(
-              (selector) =>
-                !/\.(?:matchingTools-header|smt-preview-header-nav-bar|open-editor|driver)_/.test(
-                  selector,
-                ),
-            );
+            const retained = rule.selectors.filter((selector) => !PRIVATE_SELECTOR.test(selector));
             if (retained.length === rule.selectors.length) return whole;
             if (!retained.length) return '';
             rule.selectors = retained;
@@ -426,15 +410,9 @@ export async function transformUi(source: string, options: ConversionOptions) {
       const node = path.node;
       const body = nodeText(source, node.body);
       if (!body.includes('rpcCall("/engine/model/setModelChecked"')) return;
-      const statement = node.body.body[0];
-      if (!t.isExpressionStatement(statement) || !t.isCallExpression(statement.expression)) return;
-      const call = statement.expression;
-      const id = node.params[0];
-      if (!t.isIdentifier(id)) return;
-      edit(
-        node.body,
-        `{return ${nodeText(source, call.callee)}("/engine/model/canHighlight",[${id.name}]).then(result=>result.message===true?${nodeText(source, call)}:undefined)}`,
-      );
+      const [id, checked] = node.params;
+      if (!t.isIdentifier(id) || !t.isIdentifier(checked)) return;
+      edit(node.body, `{return window.__JLCFConv.selection.highlight(${id.name},${checked.name})}`);
     },
   });
   if (
@@ -471,6 +449,8 @@ export function transformEngine(source: string, resources: ResourceBundle) {
   const edits: Edit[] = [];
   const edit = (node: t.Node, text: string) =>
     edits.push({ start: node.start!, end: node.end!, text });
+  adaptDiagnostics(tree, source, edit);
+  adaptGeometry(tree, source, edit);
   traverse(tree, {
     NewExpression(path) {
       if (t.isIdentifier(path.node.callee, { name: 'OffscreenCanvas' }))
@@ -496,7 +476,7 @@ export function transformEngine(source: string, resources: ResourceBundle) {
         return;
       edit(
         node,
-        `(${nodeText(source, node.callee)}("/engine/model/canHighlight",([id])=>{if(typeof id!=="string"||!id)throw new TypeError("元件标识无效");return Boolean(this.modelIndex[id])}),${nodeText(source, node)})`,
+        `(window.__JLCFConv.geometry.connect(this),${nodeText(source, node.callee)}("/engine/model/canHighlight",([id])=>{if(typeof id!=="string"||!id)throw new TypeError("元件标识无效");return Boolean(this.modelIndex[id])}),${nodeText(source, node)})`,
       );
     },
     StringLiteral(path) {
